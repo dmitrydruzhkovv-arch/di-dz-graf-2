@@ -742,13 +742,14 @@ function initSingleChoice(task, card) {
   return { check() {
     if (pick === null) return { ok: false };
     const ok = shown[pick].correct; const wrong = [];
-    if (!ok) { const right = shown.find(o => o.correct); wrong.push(`ты: ${fmtInline(shown[pick].text)} · верно: ${fmtInline(right.text)}`); }
+    const _right = shown.find(o => o.correct);
+    if (!ok) wrong.push(`ты: ${fmtInline(shown[pick].text)} · верно: ${fmtInline(_right.text)}`);
     shown.forEach((o, i) => {
       const b = card.querySelector(`.lk-opt[data-i="${i}"]`); b.style.borderColor = ''; b.style.background = '';
       if (o.correct) b.classList.add('is-correct'); else if (i === pick) b.classList.add('is-wrong');
       b.classList.add('is-locked');
     });
-    return { ok: true, correct: ok, wrong };
+    return { ok: true, correct: ok, wrong, pick: shown[pick].text, answer: _right.text };
   }};
 }
 
@@ -796,10 +797,11 @@ function checkCoord(task, card) {
   if (x === null || y === null) return { ok: false };
   const ok = x === task.point.x && y === task.point.y; const wrong = [];
   if (!ok) wrong.push(`ты: (${fmtNum(x)}; ${fmtNum(y)}) · верно: **(${fmtNum(task.point.x)}; ${fmtNum(task.point.y)})**`);
+  const _pick = `(${fmtNum(x)}; ${fmtNum(y)})`, _ans = `**(${fmtNum(task.point.x)}; ${fmtNum(task.point.y)})**`;
   card.querySelector(`#coord-${task.id}`).classList.add(ok ? 'is-correct' : 'is-wrong');
   card.querySelector(`#coord-x-${task.id}`).disabled = true;
   card.querySelector(`#coord-y-${task.id}`).disabled = true;
-  return { ok: true, correct: ok, wrong };
+  return { ok: true, correct: ok, wrong, pick: _pick, answer: _ans };
 }
 
 // ── РОУТЕРЫ (не-слайдерные механики) ─────────────────────────────────────────
@@ -862,8 +864,17 @@ function saveProgress() {
 function loadProgress() { try { return JSON.parse(localStorage.getItem(progKey()) || 'null'); } catch (e) { return null; } }
 function clearProgress() { try { localStorage.removeItem(progKey()); } catch (e) {} }
 
-function recordResult(task, correct, wrong) {
-  results[idx] = { label: task.label, diff: task.difficulty, correct, wrong: wrong || [], feedback: task.feedback };
+function recordResult(task, correct, wrong, res) {
+  // Снимок задания для разбора (стандарт: условие → ответ ученика → правильный → разбор).
+  // pick/answer отдают сами механики; если механика их не отдала — в разборе покажутся
+  // строки wrong[] («ты: 5 · верно: 7»), пусто не будет.
+  results[idx] = {
+    label: task.label, diff: task.difficulty, correct, wrong: wrong || [], feedback: task.feedback,
+    cond: task.intro || task.cond || '',
+    image: task.image || '',
+    pick: res && res.pick !== undefined ? res.pick : undefined,
+    answer: res && res.answer !== undefined ? res.answer : undefined,
+  };
   if (correct) { firstTryCount++; combo++; } else combo = 0;
   updateCombo();
   document.getElementById('prog-fill').style.width = `${((idx + 1) / DATA.tasks.length) * 100}%`;
@@ -964,7 +975,7 @@ function render() {
     cardReact(card, res.correct);
     document.getElementById(`fb-${task.id}`).classList.add('show');
     checkBtn.disabled = true; checkBtn.hidden = true; nextBtn.hidden = false;
-    recordResult(task, res.correct, res.wrong);
+    recordResult(task, res.correct, res.wrong, res);
   });
 }
 
