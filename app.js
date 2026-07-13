@@ -985,26 +985,22 @@ function renderSlider(task, body, card, nextBtn) {
   });
 }
 
-// ── ОТЧЁТ РЕПЕТИТОРУ (#38) ────────────────────────────────────────────────────
+// ── ОТЧЁТ И РАЗБОР (#38) ──────────────────────────────────────────────────────
+// Механика общая для всех домашек — движок по URL (di-brand-kit/hw-core.js).
+// Здесь остаётся только своё: как эта домашка рисует свою математику.
 
-const HW_ENDPOINT = 'https://194-87-110-53.nip.io/hw-result';
-function hwToken() { const p = new URLSearchParams(location.search); return (p.get('u') || p.get('id') || '').slice(0, 40); }
+const REV_HELPERS = { fmtInline, renderFeedback };
+
 function reportResults(score, total) {
-  if (reported || (devMode && !allowSend)) return;
-  const token = hwToken();
-  if (!token) return;
-  reported = true; saveProgress();
-  const errors = [];
-  results.forEach((r, i) => { if (r && !r.correct) errors.push(`№${i + 1} ${r.label}`); });
+  if (reported) return;
   const hw = `${DATA.meta.kicker} — ${DATA.meta.title}`;
   const durationSec = startPerf != null ? Math.round((performance.now() - startPerf) / 1000) : null;
-  const startedAt = startTs ? localIso(startTs) : null;
-  try {
-    fetch(HW_ENDPOINT, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, hw, hw_id: HW_ID, score, total, errors, started_at: startedAt, duration_sec: durationSec }), keepalive: true
-    }).catch(() => {});
-  } catch (e) {}
+  const sent = HwCore.report({
+    hw, hw_id: HW_ID, score, total, results,
+    startedAt: startTs ? localIso(startTs) : null,
+    durationSec, devMode, allowSend,
+  });
+  if (sent) { reported = true; saveProgress(); }
 }
 
 // ── ЭКРАН ИТОГОВ ──────────────────────────────────────────────────────────────
@@ -1022,23 +1018,7 @@ function showFinal() {
              : firstTryCount >= total - 2 ? '💪 Крепко держишь параболу!'
              : '🔁 Загляни в разборы — и прокрути ещё разок.';
 
-  const revHtml = results.map((r, i) => {
-    const mark = r.correct ? '✅' : '❌';
-    const wrongLines = (r.wrong && r.wrong.length)
-      ? `<div class="rev-wrong-line" style="padding:9px 12px;margin-bottom:10px;border-radius:12px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);font-size:13px;line-height:1.7">${r.wrong.map(w => fmtInline(w)).join('<br>')}</div>`
-      : '';
-    const razbor = `<div class="rev-razbor-label">Разбор</div>${renderFeedback(r.feedback)}`;
-    return `
-      <div class="rev-item ${r.correct ? 'ok' : 'bad'}" data-i="${i}">
-        <div class="rev-head">
-          <span class="rev-mark">${mark}</span>
-          <span class="rev-title">${r.label}</span>
-          <span class="rev-diff">${r.diff}</span>
-          ${r.correct ? '' : '<span class="rev-toggle">показать ▾</span>'}
-        </div>
-        <div class="rev-body">${wrongLines}${razbor}</div>
-      </div>`;
-  }).join('');
+  const revHtml = HwCore.revItemsHtml(results, REV_HELPERS);
 
   const f = DATA.final;
   const pct = total ? Math.round(firstTryCount / total * 100) : 0;
@@ -1137,6 +1117,16 @@ function init(data) {
   if (no)  no.addEventListener('click', hideResetConfirm);
 
   const qs = new URLSearchParams(location.search);
+  // `?r=ник.id` — Ди смотрит разбор попытки ученика. Домашку не запускаем.
+  const rev = HwCore.reviewCode();
+  if (rev) {
+    HwCore.showReview(rev, {
+      mount: document.getElementById('final-screen'),
+      helpers: REV_HELPERS,
+      hide: [document.getElementById('screen'), document.getElementById('hw-header')],
+    });
+    return;
+  }
   if (qs.get('reset') === '1') clearProgress();
   allowSend = qs.get('send') === '1';
   const g = parseInt(qs.get('g') || qs.get('goto'), 10);
