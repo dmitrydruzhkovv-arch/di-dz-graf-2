@@ -126,14 +126,9 @@ function playSound(id) {
   if (!a) return;
   try { a.currentTime = 0; a.play().catch(() => {}); } catch (e) {}
 }
-let _audioUnlocked = false;
-function unlockAudio() {                       // первый жест разблокирует autoplay для mp3
-  if (_audioUnlocked) return; _audioUnlocked = true;
-  ['snd-win', 'snd-lose', 'snd-final'].forEach(id => {
-    const a = document.getElementById(id);
-    if (a) { a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {}); }
-  });
-}
+// Разблокировка звука — в общем движке (hw-core.js): будит НА ЗАГЛУШЁННОМ звуке.
+// Раньше будили обычным play() → мелодии успевали прозвучать на первом же тапе.
+function unlockAudio() { HwCore.unlockAudio(['snd-win', 'snd-lose', 'snd-final']); }
 
 // Приятная нота на тап по любому интерактиву/кнопке. ЕДИНСТВЕННОЕ исключение —
 // «Проверить»: у неё свой звук верно/неверно, пианино на ней = двойной звук (D 10.07).
