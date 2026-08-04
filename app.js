@@ -872,6 +872,7 @@ function recordResult(task, correct, wrong, res) {
     label: task.label, diff: task.difficulty, correct, wrong: wrong || [], feedback: task.feedback,
     cond: task.intro || task.cond || '',
     image: task.image || '',
+    snap: HwCore.snap(document.getElementById(`body-${task.id}`)),
     pick: res && res.pick !== undefined ? res.pick : undefined,
     answer: res && res.answer !== undefined ? res.answer : undefined,
   };
@@ -1073,12 +1074,10 @@ function showFinal() {
   const retry = document.getElementById('btn-retry');
   if (retry) retry.addEventListener('click', showResetConfirm);
 
-  el.querySelectorAll('.rev-item.bad .rev-head').forEach(head => head.addEventListener('click', () => {
-    const item = head.closest('.rev-item');
-    const open = item.classList.toggle('open');
-    const tg = item.querySelector('.rev-toggle');
-    if (tg) tg.textContent = open ? 'скрыть ▴' : 'показать ▾';
-  }));
+  // Раскрытие — движком. Своя копия открывала ТОЛЬКО ошибочные (`.rev-item.bad`):
+  // ученик, решивший всё верно, не мог заглянуть ни в одно задание, и стили
+  // разбора из hw-core на финал не доезжали.
+  HwCore.bindToggles(el);
 }
 
 // ── ИНИЦИАЛИЗАЦИЯ ─────────────────────────────────────────────────────────────
